@@ -48,6 +48,7 @@ public class UserCommands : CommandGroup
             var msg = _aiClient.Chat
                 .AddAssistantMessage(_chatCommandSettings.SystemPrompt)
                 .AddUserMessage(message)
+                .WithTemperature(_chatCommandSettings.Temperature)
                 ;
             var response = await msg.ExecuteAsync(CancellationToken);
 
