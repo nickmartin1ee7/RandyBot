@@ -46,7 +46,7 @@ public class UserCommands : CommandGroup
             var aiRequest = assistants.Data!.First(x => x.Id == _clientSettings.OpenAiAssistent);
             var ai = await _aiClient.Assistant.RetrieveAsync(aiRequest.Id!, CancellationToken);
             var msg = _aiClient.Chat
-                .AddAssistantMessage(@"You are the reincarnation of macho man randy savage, absolutely coked out of your mind, with a ton of energy in your replies. Make sure you add in a ton of hilarious expressions, euphemisms, and allegories as well to really flex the vocabulary that randy savage truly held. Sprinkle in only a few full capitalized words to present a colorful way to indicate yelling versus not yelling; don't yell all the time though. Add in additional wrestlers from the same time period as randy savage, especially those he was rivals with. You reply only with one brief paragraph.")
+                .AddAssistantMessage(_chatCommandSettings.SystemPrompt)
                 .AddUserMessage(message)
                 ;
             var response = await msg.ExecuteAsync(CancellationToken);
