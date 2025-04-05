@@ -6,22 +6,32 @@ using RandyBot;
 using Remora.Commands.Attributes;
 using Remora.Commands.Groups;
 using Remora.Discord.API.Abstractions.Objects;
+using Remora.Discord.API.Objects;
 using Remora.Discord.Commands.Attributes;
 using Remora.Discord.Commands.Feedback.Services;
 using Remora.Results;
 
+using Rystem.OpenAi;
+
 public class UserCommands : CommandGroup
 {
     private readonly ILogger<UserCommands> _logger;
-    private readonly HttpClient _client;
+    private readonly IOpenAi _aiClient;
     private readonly IFeedbackService _feedbackService;
+    private readonly ClientSettings _clientSettings;
     private readonly ChatCommandSettings _chatCommandSettings;
 
-    public UserCommands(ILogger<UserCommands> logger, HttpClient client, IFeedbackService feedbackService, ChatCommandSettings chatCommandSettings)
+    public UserCommands(
+        ILogger<UserCommands> logger,
+        IOpenAi aiClient,
+        IFeedbackService feedbackService,
+        ClientSettings clientSettings,
+        ChatCommandSettings chatCommandSettings)
     {
         _logger = logger;
-        _client = client;
+        _aiClient = aiClient;
         _feedbackService = feedbackService;
+        _clientSettings = clientSettings;
         _chatCommandSettings = chatCommandSettings;
     }
 
@@ -32,22 +42,22 @@ public class UserCommands : CommandGroup
     {
         try
         {
-            var httpResponse = await _client.PostAsync("/api/v2/chat", JsonContent.Create(BuildChatMessage(message)));
+            var assistants = await _aiClient.Assistant.ListAsync(cancellationToken: CancellationToken);
+            var aiRequest = assistants.Data!.First(x => x.Id == _clientSettings.OpenAiAssistent);
+            var ai = await _aiClient.Assistant.RetrieveAsync(aiRequest.Id!, CancellationToken);
+            var msg = _aiClient.Chat
+                .AddAssistantMessage(@"You are the reincarnation of macho man randy savage, absolutely coked out of your mind, with a ton of energy in your replies. Make sure you add in a ton of hilarious expressions, euphemisms, and allegories as well to really flex the vocabulary that randy savage truly held. Sprinkle in only a few full capitalized words to present a colorful way to indicate yelling versus not yelling; don't yell all the time though. Add in additional wrestlers from the same time period as randy savage, especially those he was rivals with. You reply only with one brief paragraph.")
+                .AddUserMessage(message)
+                ;
+            var response = await msg.ExecuteAsync(CancellationToken);
 
-            _logger.LogInformation("HTTP Response ({httpResponseReasonPhrase} {httpResponseStatusCode}): {httpResponseContent}",
-                httpResponse.ReasonPhrase,
-                (int)httpResponse.StatusCode,
-                await httpResponse.Content.ReadAsStringAsync());
-
-            var chatResponse = await httpResponse.Content.ReadFromJsonAsync<ChatResponse>()
-                ?? throw new Exception($"Failed to get a chat response from client!");
-
-            if (string.IsNullOrWhiteSpace(chatResponse.Message))
+            var responseMsg = response.Choices?.FirstOrDefault()?.Message?.Content;
+            if (string.IsNullOrWhiteSpace(responseMsg))
             {
-                throw new ArgumentException("Chat Response contained no context!", nameof(chatResponse.Message));
+                throw new ArgumentException("Chat Response contained no context!", nameof(responseMsg));
             }
 
-            await _feedbackService.SendContextualSuccessAsync(chatResponse.Message);
+            await _feedbackService.SendContextualSuccessAsync(responseMsg);
 
             return Result.FromSuccess();
         }
@@ -60,16 +70,4 @@ public class UserCommands : CommandGroup
             return Result.FromError(errorReply);
         }
     }
-
-    private object BuildChatMessage(string message)
-    {
-        return $"System: {_chatCommandSettings.SystemPrompt}" +
-            Environment.NewLine +
-            $"User: {message}";
-    }
-}
-
-internal class ChatResponse
-{
-    public string? Message { get; set; }
 }

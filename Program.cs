@@ -8,38 +8,51 @@ using Remora.Discord.Hosting.Extensions;
 var builder = Host.CreateDefaultBuilder(args);
 
 builder.AddDiscordService(sp =>
-    sp.GetRequiredService<IConfiguration>()
+{
+    var settings = sp
+        .GetRequiredService<IConfiguration>()
         .GetSection(nameof(ClientSettings))
-        .Get<ClientSettings>()?.DiscordToken
-        ?? throw new ArgumentNullException(nameof(ClientSettings.DiscordToken)));
+        .Get<ClientSettings>();
+
+    ArgumentNullException.ThrowIfNull(settings, nameof(settings));
+
+    return settings?.DiscordToken
+        ?? throw new ArgumentNullException(nameof(ClientSettings.DiscordToken));
+});
 
 // Discord
 builder.ConfigureServices(serviceCollection =>
 {
-    serviceCollection.AddSingleton<ChatCommandSettings>(sp =>
-        sp.GetRequiredService<IConfiguration>()
-             .GetSection(nameof(ChatCommandSettings))
-             .Get<ChatCommandSettings>()
-             ?? throw new ArgumentNullException(nameof(ChatCommandSettings)));
+    serviceCollection.AddSingleton<ClientSettings>(sp =>
+    {
+        return sp.GetRequiredService<IConfiguration>()
+            .GetSection(nameof(ClientSettings))
+            .Get<ClientSettings>();
+    });
 
-    serviceCollection.AddHttpClient<UserCommands>(
-        nameof(UserCommands),
-        (sp, client) =>
+    var settings = serviceCollection
+        .BuildServiceProvider()
+        .GetRequiredService<ClientSettings>();
+
+    ArgumentNullException.ThrowIfNull(settings, nameof(settings));
+
+    serviceCollection.AddOpenAi(aiSsettings =>
+    {
+        aiSsettings.ApiKey = settings?.OpenAiToken
+             ?? throw new ArgumentNullException(nameof(ClientSettings.OpenAiToken));
+
+        aiSsettings.DefaultRequestConfiguration.Assistant = client =>
         {
-            var config = sp.GetRequiredService<IConfiguration>();
+            client.WithModel(settings.OpenAiModel
+                ?? throw new ArgumentNullException(nameof(ClientSettings.OpenAiModel)));
+        };
+    }, settings.OpenAiAssistent);
 
-            client.BaseAddress = new Uri(config
-                .GetSection(nameof(ClientSettings))
-                .Get<ClientSettings>()?.ApiUrl
-                 ?? throw new ArgumentNullException(nameof(ClientSettings.ApiUrl)));
-
-            client.DefaultRequestHeaders.TryAddWithoutValidation(
-                ClientSettings.API_KEY_HEADER,
-                config
-                    .GetSection(nameof(ClientSettings))
-                    .Get<ClientSettings>()?.ApiKey
-                    ?? throw new ArgumentNullException(nameof(ClientSettings.ApiKey)));
-        });
+    serviceCollection.AddTransient<ChatCommandSettings>(sp =>
+        sp.GetRequiredService<IConfiguration>()
+            .GetSection(nameof(ChatCommandSettings))
+            .Get<ChatCommandSettings>()
+                ?? throw new ArgumentNullException(nameof(ChatCommandSettings)));
 
     serviceCollection
         .AddDiscordCommands(true)

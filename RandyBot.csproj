@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-RandyBot-6ce860cb-5817-4f63-a61a-3f5762cc7f4d</UserSecretsId>
@@ -13,5 +13,6 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.3" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.2" />
     <PackageReference Include="Remora.Discord" Version="2025.1.0" />
+    <PackageReference Include="Rystem.OpenAi" Version="4.2.15" />
   </ItemGroup>
 </Project>
